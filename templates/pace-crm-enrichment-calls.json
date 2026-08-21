@@ -1,0 +1,51 @@
+{
+  "name": "Pace CRM enrichment calls",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "hours" }]
+        }
+      },
+      "id": "b2b2b2b2-0001-4000-8000-000000000001",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "resource": "webhook",
+        "operation": "send",
+        "endpointKey": "YOUR_JITTERFLOW_ENDPOINT_KEY",
+        "targetIdentifier": "={{ $json.leadId }}",
+        "idempotencyKey": "={{ $execution.id }}-{{ $itemIndex }}",
+        "payload": "={{ $json }}"
+      },
+      "id": "b2b2b2b2-0002-4000-8000-000000000002",
+      "name": "Jitterflow",
+      "type": "n8n-nodes-jitterflow.jitterflow",
+      "typeVersion": 1,
+      "position": [460, 300],
+      "credentials": {
+        "jitterflowApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Jitterflow API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every Hour": {
+      "main": [[{ "node": "Jitterflow", "type": "main", "index": 0 }]]
+    }
+  },
+  "meta": {
+    "description": "A CRM enrichment provider (Clearbit-style) often caps requests per lead per hour, and a batch of newly-captured leads can easily exceed that if sent as one burst. This workflow replaces a direct HTTP Request node with Jitterflow, targeted per leadId — each lead's enrichment call gets its own pacing lane, so concurrent leads don't fight over the same rate-limit window, and a failed enrichment call lands in the DLQ for one-click replay instead of silently dropping.",
+    "setup": [
+      "Precede the Jitterflow node with whatever node produces your lead list (a CRM \"new leads\" trigger, a database query, etc.) — this template starts from an hourly poll as a placeholder.",
+      "Replace YOUR_JITTERFLOW_ENDPOINT_KEY with an endpoint whose destination URL points at your enrichment provider's API.",
+      "Each input item's leadId becomes the Target Identifier, so Jitterflow paces per lead rather than per endpoint."
+    ]
+  }
+}

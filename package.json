@@ -1,0 +1,54 @@
+{
+  "name": "n8n-nodes-jitterflow",
+  "version": "0.1.0",
+  "description": "n8n community node for Jitterflow — send webhooks through jittered, rate-limited delivery and manage the dead-letter queue (list, replay, resolve) from inside a workflow.",
+  "keywords": [
+    "n8n-community-node-package"
+  ],
+  "license": "MIT",
+  "homepage": "https://jitterflow.io/integrations/n8n",
+  "author": {
+    "name": "Jitterflow"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kseminance/jitterflow.git",
+    "directory": "packages/n8n-nodes-jitterflow"
+  },
+  "files": [
+    "dist"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/JitterflowApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/Jitterflow/Jitterflow.node.js"
+    ]
+  },
+  "scripts": {
+    "build": "n8n-node build",
+    "dev": "n8n-node dev",
+    "lint": "n8n-node lint",
+    "release": "n8n-node release",
+    "test": "jest",
+    "test:integration": "jest -c jest.integration.config.js"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  },
+  "devDependencies": {
+    "@n8n/node-cli": "^0.44.5",
+    "n8n-workflow": "^2.16.0",
+    "typescript": "^5.6.3",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "@types/jest": "^29.5.13",
+    "@types/node": "^20.16.10",
+    "@jitterflow/api": "*",
+    "@jitterflow/db": "*",
+    "bcrypt": "^6.0.0",
+    "@types/bcrypt": "^5.0.2"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "name": "Rate-limit Shopify → ERP sync",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "shopify-order-created",
+        "options": {}
+      },
+      "id": "a1a1a1a1-0001-4000-8000-000000000001",
+      "name": "Shopify Order Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "resource": "webhook",
+        "operation": "send",
+        "endpointKey": "YOUR_JITTERFLOW_ENDPOINT_KEY",
+        "targetIdentifier": "={{ $json.body.shop_domain }}",
+        "idempotencyKey": "={{ $json.body.id }}",
+        "payload": "={{ $json.body }}"
+      },
+      "id": "a1a1a1a1-0002-4000-8000-000000000002",
+      "name": "Jitterflow",
+      "type": "n8n-nodes-jitterflow.jitterflow",
+      "typeVersion": 1,
+      "position": [460, 300],
+      "credentials": {
+        "jitterflowApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Jitterflow API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Shopify Order Webhook": {
+      "main": [[{ "node": "Jitterflow", "type": "main", "index": 0 }]]
+    }
+  },
+  "meta": {
+    "description": "Shopify fires an order-created webhook per order, which can burst past your ERP's per-second rate limit during a flash sale. Instead of calling the ERP directly, this workflow hands each order to Jitterflow, targeted per shop domain — Jitterflow jitters and paces delivery to stay under the ERP's rate limit, and retries/DLQs anything the ERP rejects, without your workflow needing its own retry logic.",
+    "setup": [
+      "Replace YOUR_JITTERFLOW_ENDPOINT_KEY with an endpoint whose destination URL points at your ERP's order-import API.",
+      "Set the endpoint's cadence/jitter window in the Jitterflow dashboard to match your ERP's documented rate limit.",
+      "Wire the Shopify Order Webhook node's URL into your Shopify app's webhook subscriptions (orders/create)."
+    ]
+  }
+}

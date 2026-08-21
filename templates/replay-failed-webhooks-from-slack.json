@@ -1,0 +1,98 @@
+{
+  "name": "Replay failed webhooks from a Slack alert",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "jitterflow-replay-dlq",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "c3c3c3c3-0001-4000-8000-000000000001",
+      "name": "Slack Replay Command",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "resource": "dlq",
+        "operation": "list",
+        "resolvedFilter": "unresolved"
+      },
+      "id": "c3c3c3c3-0002-4000-8000-000000000002",
+      "name": "List DLQ",
+      "type": "n8n-nodes-jitterflow.jitterflow",
+      "typeVersion": 1,
+      "position": [460, 300],
+      "credentials": {
+        "jitterflowApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Jitterflow API"
+        }
+      }
+    },
+    {
+      "parameters": { "batchSize": 1 },
+      "id": "c3c3c3c3-0003-4000-8000-000000000003",
+      "name": "Loop Over DLQ Entries",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "resource": "dlq",
+        "operation": "replay",
+        "jobId": "={{ $json.jobId }}"
+      },
+      "id": "c3c3c3c3-0004-4000-8000-000000000004",
+      "name": "Replay Job",
+      "type": "n8n-nodes-jitterflow.jitterflow",
+      "typeVersion": 1,
+      "position": [900, 400],
+      "credentials": {
+        "jitterflowApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Jitterflow API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=Replayed {{ $('List DLQ').all().length }} DLQ entr{{ $('List DLQ').all().length === 1 ? 'y' : 'ies' }}."
+      },
+      "id": "c3c3c3c3-0005-4000-8000-000000000005",
+      "name": "Respond to Slack",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 200]
+    }
+  ],
+  "connections": {
+    "Slack Replay Command": {
+      "main": [[{ "node": "List DLQ", "type": "main", "index": 0 }]]
+    },
+    "List DLQ": {
+      "main": [[{ "node": "Loop Over DLQ Entries", "type": "main", "index": 0 }]]
+    },
+    "Loop Over DLQ Entries": {
+      "main": [
+        [{ "node": "Respond to Slack", "type": "main", "index": 0 }],
+        [{ "node": "Replay Job", "type": "main", "index": 0 }]
+      ]
+    },
+    "Replay Job": {
+      "main": [[{ "node": "Loop Over DLQ Entries", "type": "main", "index": 0 }]]
+    }
+  },
+  "meta": {
+    "description": "Jitterflow's own DLQ-spike Slack alert (see docs/deployment.md) tells you something's failing — this workflow is the one-click fix. Wire the webhook URL into a Slack slash command (e.g. /jitterflow-replay) and running it lists every unresolved DLQ entry for your tenant and replays each one, immediately, without opening the dashboard. Free-tier accounts can still list DLQ entries here; replay itself is gated server-side to the Pro plan and above (POST /v1/dlq/:jobId/retry returns 403 on Developer) — same conversion moment as the dashboard's Replay button, now available from Slack.",
+    "setup": [
+      "Create a Slack slash command pointing at this workflow's webhook URL (Slack app config -> Slash Commands).",
+      "The DLQ entries returned by List DLQ include a jobId field (see apps/api/src/routes/dlq.ts) — Replay Job reads it directly via an expression, no manual mapping needed.",
+      "Swap the Slack Replay Command trigger for a direct call from your alerting tool if you'd rather not use a slash command."
+    ]
+  }
+}
