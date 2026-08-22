@@ -7,6 +7,9 @@
   ],
   "license": "MIT",
   "homepage": "https://jitterflow.io/integrations/n8n",
+  "bugs": {
+    "url": "https://github.com/jitterflow/n8n-nodes-jitterflow/issues"
+  },
   "author": {
     "name": "Jitterflow",
     "email": "support@jitterflow.io"
