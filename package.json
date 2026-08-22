@@ -12,7 +12,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/kseminance/jitterflow.git",
+    "url": "https://github.com/jitterflow/jitterflow-core-app.git",
     "directory": "packages/n8n-nodes-jitterflow"
   },
   "files": [
