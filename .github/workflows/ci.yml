@@ -24,8 +24,18 @@ jobs:
           node-version: 'lts/*'
           cache: 'npm'
 
+      # npm ci here would enforce an exact lockfile match, but this repo's
+      # devDependency graph (via @n8n/node-cli -> eslint tooling ->
+      # @langchain/community's huge optional-platform-binary tree, e.g.
+      # @unrs/resolver-binding-wasm32-wasi's nested @emnapi/* packages)
+      # hits a real npm arborist bug where `npm install` never converges to
+      # a lockfile that its own `npm ci` accepts — confirmed by repeatedly
+      # regenerating package-lock.json from scratch and seeing a different
+      # mismatch each time. None of this affects the published package,
+      # which ships zero runtime dependencies (peer-only, per n8n's
+      # convention) — it's dev/lint/build tooling only.
       - name: Install dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Run lint
         run: npm run lint
