@@ -4,8 +4,9 @@ import type {
   INodeType,
   INodeTypeDescription,
   IDataObject,
+  JsonObject,
 } from 'n8n-workflow';
-import { NodeApiError } from 'n8n-workflow';
+import { NodeApiError, NodeConnectionTypes } from 'n8n-workflow';
 
 import { jitterflowApiRequest } from './GenericFunctions';
 
@@ -19,8 +20,9 @@ export class Jitterflow implements INodeType {
     subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
     description: 'Send webhooks through jittered, rate-limited delivery and manage the dead-letter queue',
     defaults: { name: 'Jitterflow' },
-    inputs: ['main'],
-    outputs: ['main'],
+    usableAsTool: true,
+    inputs: [NodeConnectionTypes.Main],
+    outputs: [NodeConnectionTypes.Main],
     credentials: [
       {
         name: 'jitterflowApi',
@@ -222,7 +224,7 @@ export class Jitterflow implements INodeType {
           });
           continue;
         }
-        throw error;
+        throw new NodeApiError(this.getNode(), error as JsonObject);
       }
     }
 

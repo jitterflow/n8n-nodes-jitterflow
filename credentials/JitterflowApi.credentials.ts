@@ -10,6 +10,8 @@ export class JitterflowApi implements ICredentialType {
 
   displayName = 'Jitterflow API';
 
+  icon = 'file:jitterflow.svg' as const;
+
   documentationUrl = 'https://jitterflow.io/docs';
 
   properties: INodeProperties[] = [

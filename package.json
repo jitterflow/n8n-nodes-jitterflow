@@ -8,12 +8,12 @@
   "license": "MIT",
   "homepage": "https://jitterflow.io/integrations/n8n",
   "author": {
-    "name": "Jitterflow"
+    "name": "Jitterflow",
+    "email": "support@jitterflow.io"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/jitterflow/jitterflow-core-app.git",
-    "directory": "packages/n8n-nodes-jitterflow"
+    "url": "https://github.com/jitterflow/n8n-nodes-jitterflow.git"
   },
   "files": [
     "dist"
@@ -32,8 +32,7 @@
     "dev": "n8n-node dev",
     "lint": "n8n-node lint",
     "release": "n8n-node release",
-    "test": "jest",
-    "test:integration": "jest -c jest.integration.config.js"
+    "test": "jest"
   },
   "peerDependencies": {
     "n8n-workflow": "*"
@@ -45,10 +44,6 @@
     "jest": "^29.7.0",
     "ts-jest": "^29.2.5",
     "@types/jest": "^29.5.13",
-    "@types/node": "^20.16.10",
-    "@jitterflow/api": "*",
-    "@jitterflow/db": "*",
-    "bcrypt": "^6.0.0",
-    "@types/bcrypt": "^5.0.2"
+    "@types/node": "^20.16.10"
   }
 }

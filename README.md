@@ -13,7 +13,7 @@ All jitter math, TPS guarding, and DLQ decisioning happen server-side in Jitterf
 
 **Self-hosted n8n**: Settings -> Community Nodes -> install `n8n-nodes-jitterflow`.
 
-**n8n Cloud**: available once the node passes n8n's verification review (submission tracked in `docs/n8n-integration.md` at the repo root).
+**n8n Cloud**: available once the node passes n8n's verification review (submitted via [n8n's Creator Portal](https://creators.n8n.io/nodes)).
 
 ## Credential
 
@@ -21,23 +21,19 @@ Create a **Jitterflow API** credential with your tenant API key (Jitterflow dash
 
 ## Development
 
-```
-npm run build --workspace=n8n-nodes-jitterflow   # n8n-node build
-npm run lint --workspace=n8n-nodes-jitterflow    # n8n-node lint — the verification-readiness check
-npm run test --workspace=n8n-nodes-jitterflow
-npm run test:integration --workspace=n8n-nodes-jitterflow   # needs DB/Redis, same as every other package
-```
-
-Real-n8n-instance e2e (installs the built node into an actual n8n container and runs a real workflow through it):
+This package was split out of the main [jitterflow-core-app](https://github.com/jitterflow/jitterflow-core-app) monorepo so it can be a public repo, per n8n's verification requirements — day-to-day development (including integration/e2e tests against a real Jitterflow API instance) still happens there; this repo carries the standalone-buildable unit tests and is what gets published.
 
 ```
-npm run test:e2e:n8n:docker
+npm ci
+npm run build   # n8n-node build
+npm run lint    # n8n-node lint — the verification-readiness check
+npm test
 ```
 
 ## Release
 
 ```
-npm run release --workspace=n8n-nodes-jitterflow
+npm run release
 ```
 
-Bumps the version, tags, and pushes — `.github/workflows/n8n-node-release.yml` takes it from there (build, `n8n-node lint`, publish to npm with provenance). Requires the `NPM_TOKEN` repo secret; see `docs/n8n-integration.md`.
+Bumps the version, tags, and pushes — `.github/workflows/publish.yml` takes it from there (build, `n8n-node lint`, publish to npm with provenance). Requires the `NPM_TOKEN` repo secret.

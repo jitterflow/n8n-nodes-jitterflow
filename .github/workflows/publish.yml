@@ -1,0 +1,67 @@
+# Publishes this n8n community node package to npm on every version tag push.
+#
+# Starting May 1 2026, n8n requires all community nodes to be published via
+# GitHub Actions with npm provenance statements. This workflow satisfies that
+# requirement. Provenance lets anyone cryptographically verify that a package
+# was built by this exact workflow, from this exact repository and commit.
+#
+# ─── SETUP ──────────────────────────────────────────────────────────────────
+#
+# Currently using Option B (npm Automation Token) — NPM_TOKEN is set as a
+# repo secret. Option A (OIDC Trusted Publishing, no long-lived secret) can
+# be switched to later via npmjs.com -> package settings -> Publish access ->
+# Trusted Publishers, once the package has its first release and a settings
+# page to configure.
+#
+# ─── TAG CONVENTION ─────────────────────────────────────────────────────────
+#
+# Triggers on tags matching "*.*.*" (e.g. 0.2.0) — this is a single-package
+# repo, so no name prefix is needed (unlike the jitterflow-core-app monorepo
+# this package was split out of, which used `n8n-nodes-jitterflow@*` to
+# disambiguate from other packages' tags).
+#
+# ─── RELEASE PROCESS ────────────────────────────────────────────────────────
+#
+# Run locally to start an interactive release:
+#
+#   npm run release
+#
+# Lints, builds, prompts for a version bump, updates the changelog, commits,
+# tags, and pushes — which triggers this workflow to publish to npm.
+
+name: Publish
+
+on:
+  push:
+    tags:
+      - '*.*.*'
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+
+    permissions:
+      # Required to mint an OIDC token for npm provenance attestation.
+      id-token: write
+      # Scoped down from the default (write) for least-privilege publishing.
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Release
+        run: |
+          [ -n "$NPM_TOKEN" ] && npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
+          npm run release
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
