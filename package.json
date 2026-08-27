@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-jitterflow",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "n8n community node for Jitterflow — send webhooks through jittered, rate-limited delivery and manage the dead-letter queue (list, replay, resolve) from inside a workflow.",
   "keywords": [
     "n8n-community-node-package"
