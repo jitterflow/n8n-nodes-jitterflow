@@ -7,11 +7,12 @@
 #
 # ─── SETUP ──────────────────────────────────────────────────────────────────
 #
-# Currently using Option B (npm Automation Token) — NPM_TOKEN is set as a
-# repo secret. Option A (OIDC Trusted Publishing, no long-lived secret) can
-# be switched to later via npmjs.com -> package settings -> Publish access ->
-# Trusted Publishers, once the package has its first release and a settings
-# page to configure.
+# Using Option A (OIDC Trusted Publishing) — configured on npmjs.com under
+# package settings -> Publish access -> Trusted Publishers, pointing at this
+# repo + this workflow file. No npm token is used or needed: the id-token
+# permission below lets npm CLI mint a short-lived OIDC-backed publish token
+# automatically. This also sidesteps npm's 2FA-bypass-token restrictions and
+# the EOTP errors a classic/automation token hit here previously.
 #
 # ─── TAG CONVENTION ─────────────────────────────────────────────────────────
 #
@@ -61,8 +62,4 @@ jobs:
         run: npm install --no-audit --no-fund
 
       - name: Release
-        run: |
-          [ -n "$NPM_TOKEN" ] && npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
-          npm run release
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm run release
