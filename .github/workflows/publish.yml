@@ -56,6 +56,11 @@ jobs:
         with:
           node-version: 'lts/*'
           cache: 'npm'
+          # Required for OIDC Trusted Publishing — without an explicit
+          # registry-url, npm CLI can't resolve which registry to request
+          # the OIDC token exchange against and silently falls back to
+          # classic (empty) auth, failing with ENEEDAUTH.
+          registry-url: 'https://registry.npmjs.org'
 
       # See ci.yml for why this is npm install rather than npm ci.
       - name: Install dependencies
