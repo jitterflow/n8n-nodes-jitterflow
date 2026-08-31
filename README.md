@@ -35,6 +35,8 @@ All jitter math, TPS guarding, and DLQ decisioning happen server-side in Jitterf
 
 ## 🔑 Credential
 
+No Jitterflow account yet? [Sign up free](https://jitterflow.io/signup/?ref=n8n-node) — takes about two minutes.
+
 Create a **Jitterflow API** credential:
 
 - [ ] Grab your tenant API key from the Jitterflow dashboard → **API Keys** (starts with `wjg_`)
@@ -67,4 +69,4 @@ npm run release
 | `npm run release` | Bumps the version, tags, and pushes |
 | `.github/workflows/publish.yml` | Takes it from there — build, `n8n-node lint`, publish to npm with provenance |
 
-> **⚠️ Requires** the `NPM_TOKEN` repo secret to be set.
+> **🔑 Auth:** publishing uses npm's OIDC Trusted Publishing (configured on npmjs.com against this exact repo + workflow) — no `NPM_TOKEN` secret needed or used.

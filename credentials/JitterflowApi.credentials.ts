@@ -23,7 +23,7 @@ export class JitterflowApi implements ICredentialType {
       default: '',
       required: true,
       description:
-        'Your Jitterflow tenant API key (starts with wjg_). Find it in the Jitterflow dashboard under API Keys.',
+        'Your Jitterflow tenant API key (starts with wjg_). Find it in the Jitterflow dashboard under API Keys. No account yet? Sign up free: https://jitterflow.io/signup/?ref=n8n-node',
     },
     {
       displayName: 'Base URL',

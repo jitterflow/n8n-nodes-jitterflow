@@ -208,4 +208,32 @@ describe('Jitterflow node — error handling', () => {
 
     expect(result[0][0].json).toEqual({ error: 'Job not found.' });
   });
+
+  it('appends a signup hint when the API rejects a missing or invalid key', async () => {
+    const { context, httpRequestWithAuthentication } = buildContext({
+      resource: 'webhook',
+      operation: 'send',
+      endpointKey: 'ep_abc123',
+    });
+    httpRequestWithAuthentication.mockRejectedValue(new Error('Missing or malformed API key.'));
+
+    const node = new Jitterflow();
+    await expect(node.execute.call(context)).rejects.toThrow(
+      'Missing or malformed API key. ' +
+        "Don't have a Jitterflow API key yet? Sign up free: https://jitterflow.io/signup/?ref=n8n-node",
+    );
+  });
+
+  it('leaves unrelated error messages untouched', async () => {
+    const { context, httpRequestWithAuthentication } = buildContext({
+      resource: 'dlq',
+      operation: 'replay',
+      jobId: 'job_missing',
+    });
+    httpRequestWithAuthentication.mockRejectedValue(new Error('Job not found.'));
+
+    const node = new Jitterflow();
+    await expect(node.execute.call(context)).rejects.toThrow('Job not found.');
+    await expect(node.execute.call(context)).rejects.not.toThrow(/sign up/i);
+  });
 });

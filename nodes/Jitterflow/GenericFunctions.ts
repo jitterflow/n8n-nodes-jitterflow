@@ -11,7 +11,22 @@ import type {
   ILoadOptionsFunctions,
   IHttpRequestMethods,
   IDataObject,
+  JsonObject,
 } from 'n8n-workflow';
+import { NodeApiError } from 'n8n-workflow';
+
+const SIGNUP_HINT =
+  "Don't have a Jitterflow API key yet? Sign up free: https://jitterflow.io/signup/?ref=n8n-node";
+
+// The API's own 401 body ("Missing or malformed API key." / "Invalid API
+// key.") is the exact moment a user without an account hits a wall — the
+// highest-converting place to point them at signup, per the SEO/AEO audit's
+// finding 06. Matched on message content rather than a status-code field
+// since n8n's http helper's thrown-error shape isn't stable across versions;
+// "API key" only appears in that one family of auth failures server-side.
+function isMissingOrInvalidApiKeyError(error: unknown): error is Error {
+  return error instanceof Error && /api key/i.test(error.message);
+}
 
 export async function jitterflowApiRequest(
   this: IExecuteFunctions | IHookFunctions | ILoadOptionsFunctions,
@@ -31,5 +46,12 @@ export async function jitterflowApiRequest(
     json: true,
   };
 
-  return this.helpers.httpRequestWithAuthentication.call(this, 'jitterflowApi', options);
+  try {
+    return await this.helpers.httpRequestWithAuthentication.call(this, 'jitterflowApi', options);
+  } catch (error) {
+    if (isMissingOrInvalidApiKeyError(error)) {
+      error.message = `${error.message} ${SIGNUP_HINT}`;
+    }
+    throw new NodeApiError(this.getNode(), error as JsonObject);
+  }
 }
