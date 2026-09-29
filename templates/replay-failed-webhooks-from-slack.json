@@ -88,10 +88,10 @@
     }
   },
   "meta": {
-    "description": "Jitterflow's own DLQ-spike Slack alert (see docs/deployment.md) tells you something's failing — this workflow is the one-click fix. Wire the webhook URL into a Slack slash command (e.g. /jitterflow-replay) and running it lists every unresolved DLQ entry for your tenant and replays each one, immediately, without opening the dashboard. Free-tier accounts can still list DLQ entries here; replay itself is gated server-side to the Pro plan and above (POST /v1/dlq/:jobId/retry returns 403 on Developer) — same conversion moment as the dashboard's Replay button, now available from Slack.",
+    "description": "Jitterflow's DLQ-spike Slack alert tells you something's failing — this workflow is the one-click fix. Wire the webhook URL into a Slack slash command (e.g. /jitterflow-replay) and running it lists every unresolved DLQ entry for your tenant and replays each one, immediately, without opening the dashboard. Free-tier accounts can still list DLQ entries here; replay itself is gated server-side to the Pro plan and above (POST /v1/dlq/:jobId/retry returns 403 on Developer) — same conversion moment as the dashboard's Replay button, now available from Slack.",
     "setup": [
       "Create a Slack slash command pointing at this workflow's webhook URL (Slack app config -> Slash Commands).",
-      "The DLQ entries returned by List DLQ include a jobId field (see apps/api/src/routes/dlq.ts) — Replay Job reads it directly via an expression, no manual mapping needed.",
+      "The DLQ entries returned by List DLQ each include a jobId field — Replay Job reads it directly via an expression, so no manual mapping is needed.",
       "Swap the Slack Replay Command trigger for a direct call from your alerting tool if you'd rather not use a slash command."
     ]
   }
