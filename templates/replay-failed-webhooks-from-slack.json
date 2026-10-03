@@ -4,8 +4,8 @@
     {
       "parameters": {
         "content": "## Replay failed Jitterflow webhooks from a Slack slash command\n\n### Who's it for\nTeams that send webhooks or API calls through [Jitterflow](https://jitterflow.io) and get a Slack alert when deliveries start landing in the dead-letter queue (DLQ). Instead of opening a dashboard, whoever is on call types one slash command.\n\n### How it works\n1. A Slack slash command (for example `/jitterflow-replay`) calls this workflow's webhook.\n2. **List unresolved DLQ entries** fetches up to 100 unresolved failed deliveries.\n3. **Reply to Slack** answers inside Slack's 3-second limit with how many entries will be replayed.\n4. **Keep entries with a job ID** drops the empty item an empty DLQ produces.\n5. **Replay each job** re-queues every entry. Jitterflow still paces delivery to your endpoint's rate limit, so a replay burst won't trip the receiver's 429s.\n\n### Requirements\n- A Jitterflow account and API key. Listing works on every plan; replay needs the Pro plan or above (on the free Developer plan the replay step returns 403).\n- The `n8n-nodes-jitterflow` community node. It is verified by n8n, so it's available on n8n Cloud; on self-hosted n8n, install it from **Settings → Community Nodes**.\n- A Slack app you can add a slash command to.\n\n### How to set up\n1. Create a **Jitterflow API** credential and select it on both Jitterflow nodes.\n2. Activate the workflow and copy the production webhook URL.\n3. In your Slack app, add a slash command that points at that URL.\n4. Treat the URL as a secret: anyone who has it can trigger a replay.\n\n### How to customize\n- Trigger it from PagerDuty or Opsgenie instead of Slack.\n- Add a filter on `endpointId` to replay a single endpoint.",
-        "height": 820,
-        "width": 520
+        "height": 860,
+        "width": 600
       },
       "id": "c3c3c3c3-0101-4000-8000-000000000101",
       "name": "Sticky Note - Overview",
@@ -19,8 +19,8 @@
     {
       "parameters": {
         "content": "## 1. Slack calls in\nSlack sends a POST when someone runs the slash command. Slack expects an answer within 3 seconds.",
-        "height": 380,
-        "width": 260,
+        "height": 440,
+        "width": 300,
         "color": 7
       },
       "id": "c3c3c3c3-0102-4000-8000-000000000102",
@@ -28,14 +28,14 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        200,
+        280,
         60
       ]
     },
     {
       "parameters": {
         "content": "## 2. List, then answer fast\nFetch the unresolved DLQ entries and reply to Slack with the count **before** replaying anything, so the command never times out.",
-        "height": 380,
+        "height": 440,
         "width": 480,
         "color": 7
       },
@@ -44,14 +44,14 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        480,
+        600,
         60
       ]
     },
     {
       "parameters": {
         "content": "## 3. Replay\nSkip the placeholder item an empty DLQ produces, then replay each job.\n\nReplay is a Pro-plan feature. On the free Developer plan this step returns 403; the error is logged and the workflow still finishes.",
-        "height": 380,
+        "height": 440,
         "width": 480,
         "color": 7
       },
@@ -60,7 +60,7 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [
-        980,
+        1100,
         60
       ]
     },
@@ -76,7 +76,7 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        260,
+        360,
         300
       ],
       "webhookId": "c3c3c3c3-00ff-4000-8000-0000000000ff"
@@ -92,7 +92,7 @@
       "type": "n8n-nodes-jitterflow.jitterflow",
       "typeVersion": 1,
       "position": [
-        540,
+        660,
         300
       ],
       "alwaysOutputData": true,
@@ -114,7 +114,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        760,
+        880,
         300
       ]
     },
@@ -147,7 +147,7 @@
       "type": "n8n-nodes-base.filter",
       "typeVersion": 2,
       "position": [
-        1040,
+        1160,
         300
       ]
     },
@@ -162,7 +162,7 @@
       "type": "n8n-nodes-jitterflow.jitterflow",
       "typeVersion": 1,
       "position": [
-        1260,
+        1380,
         300
       ],
       "onError": "continueRegularOutput",
