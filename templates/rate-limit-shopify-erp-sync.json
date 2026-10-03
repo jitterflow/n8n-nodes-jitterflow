@@ -1,6 +1,53 @@
 {
-  "name": "Rate-limit Shopify → ERP sync",
+  "name": "Rate-limit Shopify order webhooks into your ERP with Jitterflow",
   "nodes": [
+    {
+      "parameters": {
+        "content": "## Rate-limit Shopify order webhooks into your ERP with Jitterflow\n\n### Who's it for\nShopify stores whose ERP or order-management API has a rate limit. A flash sale fires one `orders/create` webhook per order, and calling the ERP directly turns that burst into 429 errors and missing orders.\n\n### How it works\n1. **Shopify order created** receives each new order and answers Shopify straight away.\n2. **Queue order for the ERP** hands the order to [Jitterflow](https://jitterflow.io), which delivers orders to your ERP one at a time, spaced by the endpoint's cadence.\n3. The Shopify order ID is the idempotency key, so a webhook Shopify retries never imports the same order twice.\n4. Orders the ERP rejects are retried with backoff, then land in Jitterflow's dead-letter queue (DLQ) for replay.\n\n### Requirements\n- A Jitterflow account and API key. The free Developer plan works.\n- The `n8n-nodes-jitterflow` community node. It is verified by n8n, so it's available on n8n Cloud; on self-hosted n8n, install it from **Settings → Community Nodes**.\n- Access to your Shopify store's webhook settings or a custom app.\n\n### How to set up\n1. In the Jitterflow dashboard, add an endpoint whose destination URL is your ERP's order-import API. Set **Deliver one every** to the ERP's limit, for example 1 second, and put its API key in **Auth header**.\n2. Create a **Jitterflow API** credential, select it on **Queue order for the ERP**, and paste the endpoint key into **Endpoint Key**.\n3. Activate the workflow and add the production webhook URL in Shopify as an `orders/create` subscription in JSON format.\n\n### How to customize\n- Reshape **Payload** to your ERP's import format.\n- This template doesn't check Shopify's `X-Shopify-Hmac-Sha256` signature. Add a Crypto node to verify it, or treat the webhook URL as a secret.\n",
+        "height": 940,
+        "width": 600
+      },
+      "id": "a1a1a1a1-0101-4000-8000-000000000101",
+      "name": "Sticky Note - Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -360,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 1. Shopify sends the order\nShopify POSTs every new order here. The node answers right away, so Shopify never waits on your ERP.",
+        "height": 440,
+        "width": 300,
+        "color": 7
+      },
+      "id": "a1a1a1a1-0102-4000-8000-000000000102",
+      "name": "Sticky Note - Step 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        280,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 2. Queue it for the ERP\nJitterflow accepts the order instantly and delivers it to your ERP at the endpoint's cadence, however many orders arrive at once.\n\n**Target Identifier** is empty, so all orders share one lane. If several stores feed separate ERPs, set it to `{{ $json.headers['x-shopify-shop-domain'] }}` to pace each store on its own.",
+        "height": 440,
+        "width": 420,
+        "color": 7
+      },
+      "id": "a1a1a1a1-0103-4000-8000-000000000103",
+      "name": "Sticky Note - Step 2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        600,
+        60
+      ]
+    },
     {
       "parameters": {
         "httpMethod": "POST",
@@ -8,25 +55,31 @@
         "options": {}
       },
       "id": "a1a1a1a1-0001-4000-8000-000000000001",
-      "name": "Shopify Order Webhook",
+      "name": "Shopify order created",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [240, 300]
+      "position": [
+        360,
+        300
+      ],
+      "webhookId": "a1a1a1a1-00ff-4000-8000-0000000000ff"
     },
     {
       "parameters": {
         "resource": "webhook",
         "operation": "send",
         "endpointKey": "YOUR_JITTERFLOW_ENDPOINT_KEY",
-        "targetIdentifier": "={{ $json.body.shop_domain }}",
-        "idempotencyKey": "={{ $json.body.id }}",
+        "idempotencyKey": "=shopify-order-{{ $json.body.id }}",
         "payload": "={{ $json.body }}"
       },
       "id": "a1a1a1a1-0002-4000-8000-000000000002",
-      "name": "Jitterflow",
+      "name": "Queue order for the ERP",
       "type": "n8n-nodes-jitterflow.jitterflow",
       "typeVersion": 1,
-      "position": [460, 300],
+      "position": [
+        740,
+        300
+      ],
       "credentials": {
         "jitterflowApi": {
           "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
@@ -36,16 +89,24 @@
     }
   ],
   "connections": {
-    "Shopify Order Webhook": {
-      "main": [[{ "node": "Jitterflow", "type": "main", "index": 0 }]]
+    "Shopify order created": {
+      "main": [
+        [
+          {
+            "node": "Queue order for the ERP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "meta": {
-    "description": "Shopify fires an order-created webhook per order, which can burst past your ERP's per-second rate limit during a flash sale. Instead of calling the ERP directly, this workflow hands each order to Jitterflow, targeted per shop domain — Jitterflow jitters and paces delivery to stay under the ERP's rate limit, and retries/DLQs anything the ERP rejects, without your workflow needing its own retry logic.",
+    "description": "Shopify fires an orders/create webhook per order, which can burst past your ERP's rate limit during a flash sale. This workflow hands each order to Jitterflow instead of calling the ERP directly. Jitterflow delivers the orders one at a time at the endpoint's cadence, uses the Shopify order ID as the idempotency key so a retried webhook never imports twice, and retries or dead-letters anything the ERP rejects.",
     "setup": [
-      "Replace YOUR_JITTERFLOW_ENDPOINT_KEY with an endpoint whose destination URL points at your ERP's order-import API.",
-      "Set the endpoint's cadence/jitter window in the Jitterflow dashboard to match your ERP's documented rate limit.",
-      "Wire the Shopify Order Webhook node's URL into your Shopify app's webhook subscriptions (orders/create)."
+      "In the Jitterflow dashboard, add an endpoint whose destination URL is your ERP's order-import API, set its pace to the ERP's rate limit, and add the ERP's API key as its auth header.",
+      "Create a Jitterflow API credential, select it on Queue order for the ERP, and paste the endpoint key into Endpoint Key.",
+      "Activate the workflow and subscribe its production webhook URL to Shopify's orders/create topic (JSON format)."
     ]
   }
 }

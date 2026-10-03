@@ -1,0 +1,139 @@
+{
+  "name": "Push new leads into your CRM at the pace its API allows",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Push new leads into your CRM at the pace its API allows\n\n### Who's it for\nTeams that collect leads in batches (form exports, event scans, list imports) and push them into a CRM whose API caps requests per second or per day. Sending a whole batch at once trips 429 errors and drops leads.\n\n### How it works\n1. **Every hour** starts a run.\n2. **Get new leads** returns the leads to push. It ships with three sample leads so you can test the flow.\n3. **Queue lead for the CRM** hands each lead to [Jitterflow](https://jitterflow.io). All leads share one lane, so Jitterflow delivers them one at a time, spaced by the endpoint's cadence.\n4. The lead's email is the idempotency key, so a lead that shows up again in a later run is never sent twice.\n5. Leads the CRM rejects are retried with backoff, then land in Jitterflow's dead-letter queue (DLQ) for replay.\n\n### Requirements\n- A Jitterflow account and API key. The free Developer plan works.\n- The `n8n-nodes-jitterflow` community node. It is verified by n8n, so it's available on n8n Cloud; on self-hosted n8n, install it from **Settings → Community Nodes**.\n- A CRM with an HTTP API for creating contacts.\n\n### How to set up\n1. In the Jitterflow dashboard, add an endpoint whose destination URL is your CRM's create-contact API. Set **Deliver one every** to the CRM's limit, for example 1 second, and put its API key in **Auth header**.\n2. Create a **Jitterflow API** credential, select it on **Queue lead for the CRM**, and paste the endpoint key into **Endpoint Key**.\n3. Replace **Get new leads** with your real source, such as a database query or a Google Sheet. Each item needs an `email`.\n\n### How to customize\n- Map **Payload** to your CRM's field names.\n- Swap **Every hour** for a Webhook trigger to push leads as they arrive.\n",
+        "height": 940,
+        "width": 600
+      },
+      "id": "b2b2b2b2-0101-4000-8000-000000000101",
+      "name": "Sticky Note - Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -360,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 1. Collect new leads\nRuns every hour. The Code node returns three sample leads; replace it with your lead source. Each item needs an `email`.",
+        "height": 440,
+        "width": 460,
+        "color": 7
+      },
+      "id": "b2b2b2b2-0102-4000-8000-000000000102",
+      "name": "Sticky Note - Step 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        280,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## 2. Queue each lead for the CRM\nJitterflow accepts every lead instantly and delivers them to your CRM one at a time at the endpoint's cadence.\n\n**Target Identifier** is empty, so all leads share one lane, which is what keeps the CRM under its limit. The email is the idempotency key, so no lead is sent twice.",
+        "height": 440,
+        "width": 420,
+        "color": 7
+      },
+      "id": "b2b2b2b2-0103-4000-8000-000000000103",
+      "name": "Sticky Note - Step 2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        760,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "id": "b2b2b2b2-0001-4000-8000-000000000001",
+      "name": "Every hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        340,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sample leads so the workflow runs as imported.\n// Replace this node with your lead source; each item needs an email.\nreturn [\n  { json: { email: 'ada@example.com', firstName: 'Ada', lastName: 'Lovelace', company: 'Analytical Engines' } },\n  { json: { email: 'grace@example.com', firstName: 'Grace', lastName: 'Hopper', company: 'Compiler Co' } },\n  { json: { email: 'alan@example.com', firstName: 'Alan', lastName: 'Turing', company: 'Bletchley Labs' } },\n];"
+      },
+      "id": "b2b2b2b2-0003-4000-8000-000000000003",
+      "name": "Get new leads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "webhook",
+        "operation": "send",
+        "endpointKey": "YOUR_JITTERFLOW_ENDPOINT_KEY",
+        "idempotencyKey": "=lead-{{ $json.email }}",
+        "payload": "={{ $json }}"
+      },
+      "id": "b2b2b2b2-0002-4000-8000-000000000002",
+      "name": "Queue lead for the CRM",
+      "type": "n8n-nodes-jitterflow.jitterflow",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ],
+      "credentials": {
+        "jitterflowApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Jitterflow API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every hour": {
+      "main": [
+        [
+          {
+            "node": "Get new leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get new leads": {
+      "main": [
+        [
+          {
+            "node": "Queue lead for the CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "meta": {
+    "description": "Pushing a batch of new leads into a CRM all at once trips its API rate limit. This workflow hands each lead to Jitterflow instead. All leads share one lane, so Jitterflow delivers them one at a time at the endpoint's cadence; the lead's email is the idempotency key, so a lead seen again in a later run is never sent twice; and anything the CRM rejects is retried, then dead-lettered for one-click replay.",
+    "setup": [
+      "In the Jitterflow dashboard, add an endpoint whose destination URL is your CRM's create-contact API, set its pace to the CRM's rate limit, and add the CRM's API key as its auth header.",
+      "Create a Jitterflow API credential, select it on Queue lead for the CRM, and paste the endpoint key into Endpoint Key.",
+      "Replace the Get new leads sample node with your lead source; each item needs an email."
+    ]
+  }
+}
