@@ -1,0 +1,1519 @@
+{
+  "name": "Broadcast Telegram messages to Google Sheets subscribers with rate limiting and blocked-user cleanup",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Broadcast Telegram messages to Google Sheets subscribers with rate limiting and blocked-user cleanup\n\n### Who's it for\nCreators, shops and communities that send updates through a Telegram bot. Telegram limits bots to about 30 messages a second, so looping over 2,000 subscribers in n8n hits 429 errors and some people never get the message.\n\n### How it works\n1. People send **/start** or **/stop** to your bot. The top lane saves them in the **Subscribers** tab and replies.\n2. To broadcast, add a row to the **Broadcasts** tab and set its Status to **Ready**. Every 15 minutes the middle lane picks it up, checks its length and marks it **Sending**.\n3. **Queue message for subscriber** hands one message per subscriber to [Jitterflow](https://jitterflow.io), which delivers them at a steady pace, with retries. The key `tg-<broadcast>-<chat>` means nobody gets a broadcast twice, even when a run repeats.\n4. The row is marked **Sent** with the subscriber count.\n5. Each morning, the bottom lane reads Jitterflow's dead-letter queue (DLQ), marks people who blocked the bot so they're skipped next time, and clears those entries.\n\n### Requirements\n- A Telegram bot token from @BotFather. Keep it private: anyone with it controls the bot. If it leaks, send **/revoke** to @BotFather, then paste the new token into the Jitterflow endpoint and the Telegram credential.\n- A Jitterflow account and API key. The free Developer plan works.\n- The `n8n-nodes-jitterflow` community node. It is verified by n8n, so it's available on n8n Cloud; on self-hosted n8n, install it from **Settings → Community Nodes**.\n\n### How to set up\n1. In Jitterflow, add an endpoint with the destination URL `https://api.telegram.org/bot<token>/sendMessage`, a pace of 5 a second or slower, and 2 retries.\n2. Select a Telegram credential with the same token on the trigger and the three reply nodes.\n3. Select a **Jitterflow API** credential on the three Jitterflow nodes and paste the endpoint key into **Endpoint Key**.\n4. Make a sheet with a **Subscribers** tab (Chat ID, Name, Username, Status, Subscribed at, Note) and a **Broadcasts** tab (Message, Status, Broadcast ID, Sent at, Note). Select it on all eight Google Sheets nodes, then activate.\n\n### How to customize\n- Edit the bot's replies in **Bot replies**.\n- Add `parse_mode: 'HTML'` to the payload to format messages.",
+        "height": 1980,
+        "width": 640
+      },
+      "id": "d4d4d4d4-0101-4000-8000-000000000101",
+      "name": "Sticky Note - Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-420, 0]
+    },
+    {
+      "parameters": {
+        "content": "## 1. Read the command\nEvery message to the bot arrives here. **Bot replies** keeps the chat ID and name, picks out the command and holds the reply texts, so you can reword them in one place.",
+        "height": 800,
+        "width": 640,
+        "color": 7
+      },
+      "id": "d4d4d4d4-0102-4000-8000-000000000102",
+      "name": "Sticky Note - Step 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [260, 0]
+    },
+    {
+      "parameters": {
+        "content": "## 2. Save the subscriber, then reply\n**/start** adds the chat to **Subscribers** (or sets an existing row back to Subscribed). **/stop** sets it to Unsubscribed. Anything else gets a short help reply.",
+        "height": 800,
+        "width": 560,
+        "color": 7
+      },
+      "id": "d4d4d4d4-0103-4000-8000-000000000103",
+      "name": "Sticky Note - Step 2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [920, 0]
+    },
+    {
+      "parameters": {
+        "content": "## 3. Pick the next broadcast\nEvery 15 minutes, the first row in **Broadcasts** with Status **Ready** (or **Sending**, if an earlier run stopped halfway) is taken. One broadcast goes out per run.",
+        "height": 540,
+        "width": 820,
+        "color": 7
+      },
+      "id": "d4d4d4d4-0104-4000-8000-000000000104",
+      "name": "Sticky Note - Step 3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [260, 860]
+    },
+    {
+      "parameters": {
+        "content": "## 4. Check it and mark it Sending\nA message has to be 1 to 4,096 characters, Telegram's limit. A longer one is marked **Needs edit**. The broadcast ID set here keys every message it sends.",
+        "height": 540,
+        "width": 660,
+        "color": 7
+      },
+      "id": "d4d4d4d4-0105-4000-8000-000000000105",
+      "name": "Sticky Note - Step 4",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1100, 860]
+    },
+    {
+      "parameters": {
+        "content": "## 5. Queue one message per subscriber\nJitterflow accepts each message at once and delivers them at your endpoint's pace: at 5 a second, 2,000 subscribers take about 7 minutes. The row is then marked **Sent**. With no subscribers yet, the broadcast waits.",
+        "height": 540,
+        "width": 1040,
+        "color": 7
+      },
+      "id": "d4d4d4d4-0106-4000-8000-000000000106",
+      "name": "Sticky Note - Step 5",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1780, 860]
+    },
+    {
+      "parameters": {
+        "content": "## 6. Each morning, find chats that are gone\nMessages Telegram refused end up in Jitterflow's DLQ after their last retry. Only Telegram messages are kept, and only refusals that won't fix themselves: the bot was **blocked** (403) or the **chat was not found** (400).",
+        "height": 520,
+        "width": 860,
+        "color": 7
+      },
+      "id": "d4d4d4d4-0107-4000-8000-000000000107",
+      "name": "Sticky Note - Step 6",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [260, 1460]
+    },
+    {
+      "parameters": {
+        "content": "## 7. Update the sheet and clear the entry\nThe subscriber's Status becomes **Blocked** or **Chat not found**, so later broadcasts skip them, and Telegram's reason goes in **Note**. Other failures stay in the DLQ for you to check.",
+        "height": 520,
+        "width": 580,
+        "color": 7
+      },
+      "id": "d4d4d4d4-0108-4000-8000-000000000108",
+      "name": "Sticky Note - Step 7",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1140, 1460]
+    },
+    {
+      "parameters": {
+        "updates": ["message"],
+        "additionalFields": {}
+      },
+      "id": "d4d4d4d4-0001-4000-8000-000000000001",
+      "name": "When someone messages the bot",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [320, 300],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Telegram account"
+        }
+      },
+      "webhookId": "d4d4d4d4-0401-4000-8000-000000000401"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d4d4d4d4-0301-4000-8000-000000000301",
+              "name": "chatId",
+              "value": "={{ String($json.message.chat.id) }}",
+              "type": "string"
+            },
+            {
+              "id": "d4d4d4d4-0302-4000-8000-000000000302",
+              "name": "name",
+              "value": "={{ [$json.message.from?.first_name, $json.message.from?.last_name].filter(Boolean).join(' ') }}",
+              "type": "string"
+            },
+            {
+              "id": "d4d4d4d4-0303-4000-8000-000000000303",
+              "name": "username",
+              "value": "={{ $json.message.from?.username ? '@' + $json.message.from.username : '' }}",
+              "type": "string"
+            },
+            {
+              "id": "d4d4d4d4-0304-4000-8000-000000000304",
+              "name": "command",
+              "value": "={{ String($json.message.text ?? '').trim().split(/\\s+/)[0].split('@')[0].toLowerCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "d4d4d4d4-0305-4000-8000-000000000305",
+              "name": "welcomeText",
+              "value": "You're subscribed! Our updates will arrive here. Send /stop at any time to unsubscribe.",
+              "type": "string"
+            },
+            {
+              "id": "d4d4d4d4-0306-4000-8000-000000000306",
+              "name": "goodbyeText",
+              "value": "You're unsubscribed and won't get any more broadcasts. Send /start to subscribe again.",
+              "type": "string"
+            },
+            {
+              "id": "d4d4d4d4-0307-4000-8000-000000000307",
+              "name": "helpText",
+              "value": "Send /start to get our updates, or /stop to unsubscribe.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d4d4d4d4-0002-4000-8000-000000000002",
+      "name": "Bot replies",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [540, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "d4d4d4d4-0201-4000-8000-000000000201",
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/start",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Subscribe"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "d4d4d4d4-0202-4000-8000-000000000202",
+                    "leftValue": "={{ $json.command }}",
+                    "rightValue": "/stop",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Unsubscribe"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "Anything else"
+        }
+      },
+      "id": "d4d4d4d4-0003-4000-8000-000000000003",
+      "name": "Which command?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [760, 300]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Subscribers",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Chat ID": "={{ $json.chatId }}",
+            "Name": "={{ $json.name }}",
+            "Username": "={{ $json.username }}",
+            "Status": "Subscribed",
+            "Subscribed at": "={{ $now.toFormat('yyyy-MM-dd HH:mm') }}",
+            "Note": ""
+          },
+          "matchingColumns": ["Chat ID"],
+          "schema": [
+            {
+              "id": "Chat ID",
+              "displayName": "Chat ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Username",
+              "displayName": "Username",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Subscribed at",
+              "displayName": "Subscribed at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Note",
+              "displayName": "Note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "d4d4d4d4-0004-4000-8000-000000000004",
+      "name": "Save subscriber",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [1000, 160],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Bot replies').item.json.chatId }}",
+        "text": "={{ $('Bot replies').item.json.welcomeText }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "d4d4d4d4-0005-4000-8000-000000000005",
+      "name": "Reply: subscribed",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1240, 160],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Telegram account"
+        }
+      },
+      "webhookId": "d4d4d4d4-0405-4000-8000-000000000405"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Subscribers",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Chat ID": "={{ $json.chatId }}",
+            "Status": "Unsubscribed"
+          },
+          "matchingColumns": ["Chat ID"],
+          "schema": [
+            {
+              "id": "Chat ID",
+              "displayName": "Chat ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Username",
+              "displayName": "Username",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Subscribed at",
+              "displayName": "Subscribed at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Note",
+              "displayName": "Note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "d4d4d4d4-0006-4000-8000-000000000006",
+      "name": "Mark unsubscribed",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [1000, 320],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Bot replies').item.json.chatId }}",
+        "text": "={{ $('Bot replies').item.json.goodbyeText }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "d4d4d4d4-0007-4000-8000-000000000007",
+      "name": "Reply: unsubscribed",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1000, 470],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Telegram account"
+        }
+      },
+      "webhookId": "d4d4d4d4-0407-4000-8000-000000000407"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Bot replies').item.json.chatId }}",
+        "text": "={{ $('Bot replies').item.json.helpText }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "d4d4d4d4-0008-4000-8000-000000000008",
+      "name": "Reply: how to subscribe",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1000, 620],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Telegram account"
+        }
+      },
+      "webhookId": "d4d4d4d4-0408-4000-8000-000000000408"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "d4d4d4d4-0009-4000-8000-000000000009",
+      "name": "Every 15 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [320, 1080]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Broadcasts",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "d4d4d4d4-000a-4000-8000-00000000000a",
+      "name": "Read broadcasts",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [520, 1080],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d4d4d4d4-0201-4000-8000-000000000201",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "Ready",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "d4d4d4d4-0202-4000-8000-000000000202",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "Sending",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "d4d4d4d4-000b-4000-8000-00000000000b",
+      "name": "Ready to send",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [720, 1080]
+    },
+    {
+      "parameters": {},
+      "id": "d4d4d4d4-000c-4000-8000-00000000000c",
+      "name": "One broadcast per run",
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [920, 1080]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d4d4d4d4-0308-4000-8000-000000000308",
+              "name": "row_number",
+              "value": "={{ $json.row_number }}",
+              "type": "number"
+            },
+            {
+              "id": "d4d4d4d4-0309-4000-8000-000000000309",
+              "name": "broadcastId",
+              "value": "={{ $json['Broadcast ID'] || 'bc-' + $json.row_number + '-' + $now.toFormat('yyMMddHHmm') }}",
+              "type": "string"
+            },
+            {
+              "id": "d4d4d4d4-030a-4000-8000-00000000030a",
+              "name": "message",
+              "value": "={{ String($json.Message ?? '').trim() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d4d4d4d4-000d-4000-8000-00000000000d",
+      "name": "Prepare broadcast",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1160, 1080]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d4d4d4d4-0203-4000-8000-000000000203",
+              "leftValue": "={{ $json.message.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            },
+            {
+              "id": "d4d4d4d4-0204-4000-8000-000000000204",
+              "leftValue": "={{ $json.message.length }}",
+              "rightValue": 4096,
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4d4d4d4-000e-4000-8000-00000000000e",
+      "name": "Message fits Telegram?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1380, 1080]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Broadcasts",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $json.row_number }}",
+            "Status": "Needs edit",
+            "Note": "={{ 'Message is ' + $json.message.length + ' characters; Telegram allows 1 to 4,096' }}"
+          },
+          "matchingColumns": ["row_number"],
+          "schema": [
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Broadcast ID",
+              "displayName": "Broadcast ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Sent at",
+              "displayName": "Sent at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Note",
+              "displayName": "Note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "d4d4d4d4-000f-4000-8000-00000000000f",
+      "name": "Mark needs edit",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [1600, 1240],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Broadcasts",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $json.row_number }}",
+            "Status": "Sending",
+            "Broadcast ID": "={{ $json.broadcastId }}",
+            "Note": "Queuing now. If it stays Sending, nobody has subscribed yet."
+          },
+          "matchingColumns": ["row_number"],
+          "schema": [
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Broadcast ID",
+              "displayName": "Broadcast ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Sent at",
+              "displayName": "Sent at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Note",
+              "displayName": "Note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "d4d4d4d4-0010-4000-8000-000000000010",
+      "name": "Mark sending",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [1600, 1080],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Subscribers",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "d4d4d4d4-0011-4000-8000-000000000011",
+      "name": "Read subscribers",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [1840, 1080],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d4d4d4d4-0205-4000-8000-000000000205",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": "Subscribed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4d4d4d4-0012-4000-8000-000000000012",
+      "name": "Subscribed only",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [2040, 1080]
+    },
+    {
+      "parameters": {
+        "resource": "webhook",
+        "operation": "send",
+        "endpointKey": "YOUR_JITTERFLOW_ENDPOINT_KEY",
+        "idempotencyKey": "=tg-{{ $('Prepare broadcast').first().json.broadcastId }}-{{ $json['Chat ID'] }}",
+        "payload": "={{ { chat_id: String($json['Chat ID']), text: $('Prepare broadcast').first().json.message } }}"
+      },
+      "id": "d4d4d4d4-0013-4000-8000-000000000013",
+      "name": "Queue message for subscriber",
+      "type": "n8n-nodes-jitterflow.jitterflow",
+      "typeVersion": 1,
+      "position": [2260, 1080],
+      "credentials": {
+        "jitterflowApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Jitterflow API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "queued",
+        "options": {}
+      },
+      "id": "d4d4d4d4-0014-4000-8000-000000000014",
+      "name": "Count queued",
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [2480, 1080]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Broadcasts",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $('Prepare broadcast').first().json.row_number }}",
+            "Status": "Sent",
+            "Sent at": "={{ $now.toFormat('yyyy-MM-dd HH:mm') }}",
+            "Note": "={{ 'Queued for ' + $json.queued.length + ' subscribers' + ($json.queued.some(j => j.idempotent) ? ', ' + $json.queued.filter(j => j.idempotent).length + ' of them by an earlier run' : '') }}"
+          },
+          "matchingColumns": ["row_number"],
+          "schema": [
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Broadcast ID",
+              "displayName": "Broadcast ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Sent at",
+              "displayName": "Sent at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Note",
+              "displayName": "Note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "d4d4d4d4-0015-4000-8000-000000000015",
+      "name": "Mark sent",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [2700, 1080],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "d4d4d4d4-0016-4000-8000-000000000016",
+      "name": "Every morning at 8",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [320, 1700]
+    },
+    {
+      "parameters": {
+        "resource": "dlq",
+        "operation": "list",
+        "resolvedFilter": "unresolved"
+      },
+      "id": "d4d4d4d4-0017-4000-8000-000000000017",
+      "name": "List undelivered messages",
+      "type": "n8n-nodes-jitterflow.jitterflow",
+      "typeVersion": 1,
+      "position": [540, 1700],
+      "credentials": {
+        "jitterflowApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Jitterflow API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d4d4d4d4-0206-4000-8000-000000000206",
+              "leftValue": "={{ String($json.lastPayload?.chat_id ?? '') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "d4d4d4d4-0207-4000-8000-000000000207",
+              "leftValue": "={{ String($json.lastPayload?.text ?? '') }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d4d4d4d4-0018-4000-8000-000000000018",
+      "name": "Telegram messages only",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [780, 1700]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d4d4d4d4-0208-4000-8000-000000000208",
+              "leftValue": "={{ Number($json.responseStatus ?? 0) }}",
+              "rightValue": 403,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "d4d4d4d4-0209-4000-8000-000000000209",
+              "leftValue": "={{ String($json.responseBody ?? '') }}",
+              "rightValue": "chat not found",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "d4d4d4d4-0019-4000-8000-000000000019",
+      "name": "Blocked or chat gone",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [1000, 1700]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Subscribers",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Chat ID": "={{ String($json.lastPayload.chat_id) }}",
+            "Status": "={{ Number($json.responseStatus) === 403 ? 'Blocked' : 'Chat not found' }}",
+            "Note": "={{ String($json.responseBody ?? '').match(/\"description\"\\s*:\\s*\"([^\"]*)\"/)?.[1] ?? 'HTTP ' + $json.responseStatus }}"
+          },
+          "matchingColumns": ["Chat ID"],
+          "schema": [
+            {
+              "id": "Chat ID",
+              "displayName": "Chat ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Username",
+              "displayName": "Username",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Subscribed at",
+              "displayName": "Subscribed at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Note",
+              "displayName": "Note",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "d4d4d4d4-001a-4000-8000-00000000001a",
+      "name": "Mark subscriber unreachable",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [1240, 1620],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "dlq",
+        "operation": "resolve",
+        "jobId": "={{ $json.jobId }}"
+      },
+      "id": "d4d4d4d4-001b-4000-8000-00000000001b",
+      "name": "Clear DLQ entry",
+      "type": "n8n-nodes-jitterflow.jitterflow",
+      "typeVersion": 1,
+      "position": [1240, 1800],
+      "credentials": {
+        "jitterflowApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL_ID",
+          "name": "Jitterflow API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "When someone messages the bot": {
+      "main": [
+        [
+          {
+            "node": "Bot replies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bot replies": {
+      "main": [
+        [
+          {
+            "node": "Which command?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Which command?": {
+      "main": [
+        [
+          {
+            "node": "Save subscriber",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark unsubscribed",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Reply: unsubscribed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply: how to subscribe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save subscriber": {
+      "main": [
+        [
+          {
+            "node": "Reply: subscribed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every 15 minutes": {
+      "main": [
+        [
+          {
+            "node": "Read broadcasts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read broadcasts": {
+      "main": [
+        [
+          {
+            "node": "Ready to send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready to send": {
+      "main": [
+        [
+          {
+            "node": "One broadcast per run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One broadcast per run": {
+      "main": [
+        [
+          {
+            "node": "Prepare broadcast",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare broadcast": {
+      "main": [
+        [
+          {
+            "node": "Message fits Telegram?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message fits Telegram?": {
+      "main": [
+        [
+          {
+            "node": "Mark sending",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark needs edit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark sending": {
+      "main": [
+        [
+          {
+            "node": "Read subscribers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read subscribers": {
+      "main": [
+        [
+          {
+            "node": "Subscribed only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Subscribed only": {
+      "main": [
+        [
+          {
+            "node": "Queue message for subscriber",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queue message for subscriber": {
+      "main": [
+        [
+          {
+            "node": "Count queued",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Count queued": {
+      "main": [
+        [
+          {
+            "node": "Mark sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every morning at 8": {
+      "main": [
+        [
+          {
+            "node": "List undelivered messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List undelivered messages": {
+      "main": [
+        [
+          {
+            "node": "Telegram messages only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram messages only": {
+      "main": [
+        [
+          {
+            "node": "Blocked or chat gone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Blocked or chat gone": {
+      "main": [
+        [
+          {
+            "node": "Mark subscriber unreachable",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Clear DLQ entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "meta": {
+    "description": "Lets people subscribe to a Telegram bot with /start and /stop, keeping the list in Google Sheets. Broadcasts written in the sheet are queued in Jitterflow, which delivers one message per subscriber at a steady pace with retries and no duplicates. A daily lane reads the dead-letter queue and marks subscribers who blocked the bot.",
+    "setup": [
+      "Add a Jitterflow endpoint pointing at https://api.telegram.org/bot<token>/sendMessage, paced at 5 a second or slower.",
+      "Select your Telegram credential on the trigger and the three reply nodes.",
+      "Select your Jitterflow API credential on the three Jitterflow nodes and paste the endpoint key.",
+      "Create a sheet with Subscribers and Broadcasts tabs, select it on the eight Google Sheets nodes, then activate."
+    ]
+  }
+}
